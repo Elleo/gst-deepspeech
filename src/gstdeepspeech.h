@@ -45,11 +45,13 @@
 #define __GST_DEEPSPEECH_H__
 
 #include <gst/gst.h>
+#include <gst/base/gstbasetransform.h>
+#include "deepspeech.h"
 
 G_BEGIN_DECLS
 
 #define GST_TYPE_DEEPSPEECH \
-  (gst_deep_speech_get_type())
+  (gst_deepspeech_get_type())
 #define GST_DEEPSPEECH(obj) \
   (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_DEEPSPEECH,GstDeepSpeech))
 #define GST_DEEPSPEECH_CLASS(klass) \
@@ -62,10 +64,16 @@ G_BEGIN_DECLS
 typedef struct _GstDeepSpeech      GstDeepSpeech;
 typedef struct _GstDeepSpeechClass GstDeepSpeechClass;
 
+using namespace DeepSpeech;
+
 struct _GstDeepSpeech
 {
-  GstElement element;
+  GstBaseTransform element;
   GstPad *sinkpad, *srcpad;
+  gint          quiet_bufs;
+  Model         *model;
+  GstBuffer     *buf;
+  GThreadPool   *thread_pool;
   gboolean silent;
 };
 
@@ -74,7 +82,7 @@ struct _GstDeepSpeechClass
   GstElementClass parent_class;
 };
 
-GType gst_deep_speech_get_type (void);
+GType gst_deepspeech_get_type (void);
 
 G_END_DECLS
 
