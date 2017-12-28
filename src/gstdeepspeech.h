@@ -74,6 +74,12 @@ struct _GstDeepSpeech
   Model         *model;
   GstBuffer     *buf;
   GThreadPool   *thread_pool;
+  gchar         *speech_model_path;
+  gchar         *alphabet_path;
+  gchar         *language_model_path;
+  gchar         *trie_path;
+  gdouble       silence_threshold;
+  gint          silence_length;
   gboolean silent;
 };
 

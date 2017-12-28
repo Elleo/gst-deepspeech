@@ -73,23 +73,30 @@ GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 #define LM_WEIGHT 1.75f
 #define WORD_COUNT_WEIGHT 1.00f
 #define VALID_WORD_COUNT_WEIGHT 1.00f
-#define MODEL "/usr/share/deepspeech/models/output_graph.pb"
-#define LM_BINARY "/usr/share/deepspeech/models/lm.binary"
-#define TRIE "/usr/share/deepspeech/models/trie"
-#define ALPHABET "/usr/share/deepspeech/models/alphabet.txt"
+
+#define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/output_graph.pb"
+#define DEFAULT_LANGUAGE_MODEL "/usr/share/deepspeech/models/lm.binary"
+#define DEFAULT_TRIE "/usr/share/deepspeech/models/trie"
+#define DEFAULT_ALPHABET "/usr/share/deepspeech/models/alphabet.txt"
+#define DEFAULT_SILENCE_THRESHOLD 0.1
+#define DEFAULT_SILENCE_LENGTH 5
 
 
 /* Filter signals and args */
 enum
 {
-  /* FILL ME */
   LAST_SIGNAL
 };
 
 enum
 {
   PROP_0,
-  PROP_SILENT
+  PROP_SPEECH_MODEL,
+  PROP_ALPHABET,
+  PROP_LANGUAGE_MODEL,
+  PROP_TRIE,
+  PROP_SILENCE_THRESHOLD,
+  PROP_SILENCE_LENGTH
 };
 
 /* the capabilities of the inputs and outputs. */
@@ -116,6 +123,7 @@ static void gst_deepspeech_get_property (GObject * object, guint prop_id,
 static gboolean gst_deepspeech_sink_event (GstPad * pad, GstObject * parent, GstEvent * event);
 static GstFlowReturn gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf);
 static GstMessage * gst_deepspeech_message_new (GstDeepSpeech * deepspeech, GstBuffer * buf, const char * text);
+static void gst_deepspeech_load_model (GstDeepSpeech * deepspeech);
 
 static GMutex mutex;
 
@@ -162,9 +170,25 @@ gst_deepspeech_class_init (GstDeepSpeechClass * klass)
   gobject_class->set_property = gst_deepspeech_set_property;
   gobject_class->get_property = gst_deepspeech_get_property;
 
-  g_object_class_install_property (gobject_class, PROP_SILENT,
-      g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
-          FALSE, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_SPEECH_MODEL,
+      g_param_spec_string ("speech-model", "Speech Model", "Location of the speech graph file.",
+          DEFAULT_SPEECH_MODEL, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_ALPHABET,
+      g_param_spec_string ("alphabet", "Alphabet", "Location of the alphabet file corresponding to the speech model.",
+          DEFAULT_ALPHABET, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_LANGUAGE_MODEL,
+      g_param_spec_string ("language-model", "Language Model", "Location of the language model file.",
+          DEFAULT_LANGUAGE_MODEL, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_TRIE,
+      g_param_spec_string ("trie", "Trie", "Location of the trie file corresponding to the language model.",
+          DEFAULT_TRIE, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_SILENCE_THRESHOLD,
+      g_param_spec_double ("silence-threshold", "Silence Threshold", "Segment speech when volume is below the threshold for the specified silence length.",
+          0, 1.0, DEFAULT_SILENCE_THRESHOLD, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_SILENCE_LENGTH,
+      g_param_spec_int ("silence-length", "Silence Length", "Number of buffers which must be below the silence threshold before segmentation occurs.",
+          0, G_MAXINT, DEFAULT_SILENCE_LENGTH, G_PARAM_READWRITE));
+
 
   gst_element_class_set_details_simple(gstelement_class,
     "deepspeech",
@@ -202,12 +226,23 @@ gst_deepspeech_init (GstDeepSpeech * deepspeech)
   GST_PAD_SET_PROXY_CAPS (deepspeech->srcpad);
   gst_element_add_pad (GST_ELEMENT (deepspeech), deepspeech->srcpad);
 
-  deepspeech->silent = FALSE;
+  deepspeech->speech_model_path = g_strdup (DEFAULT_SPEECH_MODEL);
+  deepspeech->alphabet_path = g_strdup (DEFAULT_ALPHABET);
+  deepspeech->language_model_path = g_strdup (DEFAULT_LANGUAGE_MODEL);
+  deepspeech->trie_path = g_strdup (DEFAULT_TRIE);
+  deepspeech->silence_threshold = DEFAULT_SILENCE_THRESHOLD;
+  deepspeech->silence_length = DEFAULT_SILENCE_LENGTH;
   deepspeech->quiet_bufs = 0;
-  deepspeech->model = new Model(MODEL, N_CEP, N_CONTEXT, ALPHABET, BEAM_WIDTH);
-  deepspeech->model->enableDecoderWithLM(ALPHABET, LM_BINARY, TRIE, LM_WEIGHT, WORD_COUNT_WEIGHT, VALID_WORD_COUNT_WEIGHT);
+  gst_deepspeech_load_model (deepspeech);
   deepspeech->buf = gst_buffer_new();
   deepspeech->thread_pool = g_thread_pool_new((GFunc) run_model_async, (gpointer) deepspeech, -1, FALSE, NULL);
+}
+
+static void
+gst_deepspeech_load_model (GstDeepSpeech * deepspeech)
+{
+  deepspeech->model = new Model(deepspeech->speech_model_path, N_CEP, N_CONTEXT, deepspeech->alphabet_path, BEAM_WIDTH);
+  deepspeech->model->enableDecoderWithLM(deepspeech->alphabet_path, deepspeech->language_model_path, deepspeech->trie_path, LM_WEIGHT, WORD_COUNT_WEIGHT, VALID_WORD_COUNT_WEIGHT);
 }
 
 static void
@@ -217,8 +252,27 @@ gst_deepspeech_set_property (GObject * object, guint prop_id,
   GstDeepSpeech *deepspeech = GST_DEEPSPEECH (object);
 
   switch (prop_id) {
-    case PROP_SILENT:
-      deepspeech->silent = g_value_get_boolean (value);
+    case PROP_SPEECH_MODEL:
+      deepspeech->speech_model_path = g_value_dup_string (value);
+      gst_deepspeech_load_model (deepspeech);
+      break;
+    case PROP_ALPHABET:
+      deepspeech->alphabet_path = g_value_dup_string (value);
+      gst_deepspeech_load_model (deepspeech);
+      break;
+    case PROP_LANGUAGE_MODEL:
+      deepspeech->language_model_path = g_value_dup_string (value);
+      gst_deepspeech_load_model (deepspeech);
+      break;
+    case PROP_TRIE:
+      deepspeech->trie_path = g_value_dup_string (value);
+      gst_deepspeech_load_model (deepspeech);
+      break;
+    case PROP_SILENCE_THRESHOLD:
+      deepspeech->silence_threshold = g_value_get_double (value);
+      break;
+    case PROP_SILENCE_LENGTH:
+      deepspeech->silence_length = g_value_get_int (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -233,8 +287,23 @@ gst_deepspeech_get_property (GObject * object, guint prop_id,
   GstDeepSpeech *deepspeech = GST_DEEPSPEECH (object);
 
   switch (prop_id) {
-    case PROP_SILENT:
-      g_value_set_boolean (value, deepspeech->silent);
+    case PROP_SPEECH_MODEL:
+      g_value_set_string (value, deepspeech->speech_model_path);
+      break;
+    case PROP_ALPHABET:
+      g_value_set_string (value, deepspeech->alphabet_path);
+      break;
+    case PROP_LANGUAGE_MODEL:
+      g_value_set_string (value, deepspeech->language_model_path);
+      break;
+    case PROP_TRIE:
+      g_value_set_string (value, deepspeech->trie_path);
+      break;
+    case PROP_SILENCE_THRESHOLD:
+      g_value_set_double (value, deepspeech->silence_threshold);
+      break;
+    case PROP_SILENCE_LENGTH:
+      g_value_set_int (value, deepspeech->silence_length);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -280,30 +349,21 @@ gst_deepspeech_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_CAPS:
-    {
       GstCaps * caps;
 
       gst_event_parse_caps (event, &caps);
-      /* do something with the caps */
-
-      /* and forward */
       ret = gst_pad_event_default (pad, parent, event);
       break;
-    }
     case GST_EVENT_EOS:
-    {
       if (gst_buffer_get_size(deepspeech->buf) > 0) {
         g_thread_pool_push(deepspeech->thread_pool, (gpointer) gst_buffer_copy_deep(deepspeech->buf), NULL);
       }
       g_thread_pool_free(deepspeech->thread_pool, FALSE, TRUE);
       ret = gst_pad_event_default (pad, parent, event);
       break;
-    }
     default:
-    {
       ret = gst_pad_event_default (pad, parent, event);
       break;
-    }
   }
   return ret;
 }
@@ -342,18 +402,18 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 
  // g_print("ncs: %.2f, nps: %.2f\n", ncs, nps);
 
-  if (ncs > 0.1 || gst_buffer_get_size(deepspeech->buf) > 0) {
+  if (ncs > deepspeech->silence_threshold || gst_buffer_get_size(deepspeech->buf) > 0) {
     gst_buffer_ref(buf);
     deepspeech->buf = gst_buffer_append(deepspeech->buf, buf);
   }
 
-  if (ncs < 0.1 && gst_buffer_get_size(deepspeech->buf) > 0) {
+  if (ncs < deepspeech->silence_threshold && gst_buffer_get_size(deepspeech->buf) > 0) {
     deepspeech->quiet_bufs++;
   } else {
     deepspeech->quiet_bufs = 0;
   }
 
-  if (deepspeech->quiet_bufs > 5 && gst_buffer_get_size(deepspeech->buf) > 0) {
+  if (deepspeech->quiet_bufs > deepspeech->silence_length && gst_buffer_get_size(deepspeech->buf) > 0) {
       g_thread_pool_push(deepspeech->thread_pool, (gpointer) gst_buffer_copy_deep(deepspeech->buf), NULL);
       deepspeech->buf = gst_buffer_new();
       deepspeech->quiet_bufs = 0;
