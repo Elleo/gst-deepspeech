@@ -59,10 +59,10 @@
 #endif
 
 #include <gst/gst.h>
+#include <deepspeech.h>
 #include <string.h>
 
 #include "gstdeepspeech.h"
-#include "deepspeech.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 #define GST_CAT_DEFAULT gst_deepspeech_debug
@@ -73,10 +73,10 @@ GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 #define LM_WEIGHT 1.75f
 #define WORD_COUNT_WEIGHT 1.00f
 #define VALID_WORD_COUNT_WEIGHT 1.00f
-#define MODEL "/home/mike/src/deepspeech/models/output_graph.pb"
-#define LM_BINARY "/home/mike/src/deepspeech/models/lm.binary"
-#define TRIE "/home/mike/src/deepspeech/models/trie"
-#define ALPHABET "/home/mike/src/deepspeech/models/alphabet.txt"
+#define MODEL "/usr/share/deepspeech/models/output_graph.pb"
+#define LM_BINARY "/usr/share/deepspeech/models/lm.binary"
+#define TRIE "/usr/share/deepspeech/models/trie"
+#define ALPHABET "/usr/share/deepspeech/models/alphabet.txt"
 
 
 /* Filter signals and args */
@@ -290,9 +290,20 @@ gst_deepspeech_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
       ret = gst_pad_event_default (pad, parent, event);
       break;
     }
-    default:
+    case GST_EVENT_EOS:
+    {
+      if (gst_buffer_get_size(deepspeech->buf) > 0) {
+        g_thread_pool_push(deepspeech->thread_pool, (gpointer) gst_buffer_copy_deep(deepspeech->buf), NULL);
+      }
+      g_thread_pool_free(deepspeech->thread_pool, FALSE, TRUE);
       ret = gst_pad_event_default (pad, parent, event);
       break;
+    }
+    default:
+    {
+      ret = gst_pad_event_default (pad, parent, event);
+      break;
+    }
   }
   return ret;
 }
