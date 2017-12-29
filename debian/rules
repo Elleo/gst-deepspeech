@@ -7,3 +7,7 @@ export DPKG_GENSYMBOLS_CHECK_LEVEL=4
 
 %:
 	dh $@ --parallel --fail-missing
+
+override_dh_auto_configure:
+	./autogen.sh
+	dh_auto_configure
