@@ -1,0 +1,23 @@
+Source: gstreamer1.0-deepspeech
+Section: sound
+Priority: optional
+Maintainer: Michael Sheldon <elleo@gnu.org>
+Build-Depends: build-essential,
+               debhelper (>= 9),
+               pkg-config,
+               libgstreamer1.0-dev,
+               libgstreamer-plugins-base1.0-dev,
+               libdeepspeech-dev,
+Standards-Version: 3.9.5
+Homepage: https://github.com/Elleo/gst-deepspeech
+
+Package: gstreamer1.0-deepspeech
+Architecture: amd64
+Depends: deepspeech-model,
+         libdeepspeech,
+         libtensorflow-cc,
+         ${misc:Depends},
+         ${shlibs:Depends},
+Description: Speech recognition plugin for GStreamer
+ Speech recognition suitable for untrained continuous dictation using the
+ Mozilla DeepSpeech model.

@@ -1,0 +1,13 @@
+Package: gstreamer1.0-deepspeech-dbgsym
+Package-Type: ddeb
+Source: gstreamer1.0-deepspeech
+Version: 0.1.0
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Michael Sheldon <elleo@gnu.org>
+Installed-Size: 36
+Depends: gstreamer1.0-deepspeech (= 0.1.0)
+Section: debug
+Priority: extra
+Description: Debug symbols for gstreamer1.0-deepspeech
+Build-Ids: d9fac76e90c8335db1d1cbec02b52f6a26824388
