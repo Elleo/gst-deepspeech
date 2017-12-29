@@ -137,8 +137,6 @@ gpointer run_model_async(void * instance_data, void * pool_data)
   int n_frames = 0;
   char *result;
 
-  g_print("Processing...\n");
-
   gst_buffer_map(buf, &info, GST_MAP_READ);
   g_mutex_lock(&mutex);
   deepspeech->model->getInputVector((const short *)info.data, (unsigned int) info.size, 16000, &mfcc, &n_frames);
@@ -146,7 +144,6 @@ gpointer run_model_async(void * instance_data, void * pool_data)
   g_mutex_unlock(&mutex);
 
   if (strlen(result) > 0) {
-    g_print ("Buf size: %d, Result: %s\n", (int) info.size, result);
     GstMessage *msg = gst_deepspeech_message_new (deepspeech, buf, result);
     gst_element_post_message (GST_ELEMENT (deepspeech), msg);
   }
@@ -400,8 +397,6 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   normalizer = (gdouble) (G_GINT64_CONSTANT(1) << 30);
   ncs = squaresum / normalizer;
   nps = peaksquare / normalizer;
-
- // g_print("ncs: %.2f, nps: %.2f\n", ncs, nps);
 
   if (ncs > deepspeech->silence_threshold || gst_buffer_get_size(deepspeech->buf) > 0) {
     gst_buffer_ref(buf);
