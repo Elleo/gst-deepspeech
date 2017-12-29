@@ -44,12 +44,13 @@
 /**
  * SECTION:element-deepspeech
  *
- * FIXME:Describe deepspeech here.
+ * Speech recognition plugin suitable for continuous dictation based on 
+ * Mozilla's DeepSpeech model.
  *
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch -v -m fakesrc ! deepspeech ! fakesink silent=TRUE
+ * gst-launch-1.0 -m pulsesrc ! audioconvert ! audiorate ! audioresample ! deepspeech silence-threshold=0.2 silence-length=20 ! fakesink
  * ]|
  * </refsect2>
  */
