@@ -20,7 +20,7 @@ if __name__ == "__main__":
     Gst.init(None)
     loop = GObject.MainLoop()
 
-    pipeline = Gst.parse_launch("pulsesrc ! audioconvert ! audiorate ! audioresample ! deepspeech silence-length=20 ! fakesink")
+    pipeline = Gst.parse_launch("autoaudiosrc ! audioconvert ! audiorate ! audioresample ! deepspeech silence-length=20 ! fakesink")
     
     bus = pipeline.get_bus()
     bus.add_signal_watch()
