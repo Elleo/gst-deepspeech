@@ -13,9 +13,9 @@ Homepage: https://github.com/Elleo/gst-deepspeech
 
 Package: gstreamer1.0-deepspeech
 Architecture: amd64
-Depends: deepspeech-model,
-         libdeepspeech,
-         libtensorflow-cc,
+Depends: deepspeech-model (>= 0.1.1),
+         libdeepspeech (>= 0.1.1),
+         libtensorflow-cc (>= 0.1.1),
          ${misc:Depends},
          ${shlibs:Depends},
 Description: Speech recognition plugin for GStreamer
