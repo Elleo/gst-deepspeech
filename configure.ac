@@ -17,6 +17,43 @@ AM_INIT_AUTOMAKE([1.10])
 dnl enable mainainer mode by default
 AM_MAINTAINER_MODE([enable])
 
+AC_DEFUN([AP_CHECK_DS],
+[
+  AC_ARG_VAR([DS_SRC], [Path to DeepSpeech sources, same as DS_LIB if --with-deepspeech set])
+  AC_ARG_VAR([DS_LIB], [Path to DeepSpeech libraries and binaries, same as DS_SRC if --with-deepspeech set])
+  AC_ARG_WITH([deepspeech],
+    [dnl
+AS_HELP_STRING([--with-deepspeech],dnl
+[Uninstalled source directory for DeepSpeech, defines DS_SRC and DS_LIB for Makefile, otherwise these are set to paths of installed files.])
+    ],
+    [dnl
+      echo "Using DeepSpeech from $withval"
+      DS_LIB=$withval
+      DS_SRC=$withval
+    ],[
+      DS_LIB="/usr/lib/deepspeech"
+      DS_SRC=""
+    ])
+  if test -z "$DS_LIB" || ! test -d "$DS_LIB"; then
+    AC_MSG_ERROR([Could not find sources dir for DeepSpeech (DS_LIB="$DS_LIB", $withval)])
+  fi
+])
+]
+
+AH_TEMPLATE(HAVE_TENSORFLOW, [Have TENSORFLOW])
+AC_ARG_ENABLE(tensorflow, AC_HELP_STRING([--enable-tensorflow],
+        [enable external tensorflow libraries]),
+        [tensorflow=${enableval}], [tensorflow=no])
+dnl must be AS_IF for some aclocals to pick PKG_CHECK_MODULES somehow.
+dnl AC_PROVIDE_IFELSE doesn't work on mac?
+AS_IF([test x$tensorflow = xyes], [
+      AC_SEARCH_LIBS([tf_git_version], [tensorflow_cc],
+          AC_DEFINE(HAVE_TENSORFLOW, 1),
+          AC_DEFINE(HAVE_TENSORFLOW, 0),[])
+      ])
+AM_CONDITIONAL([HAVE_TENSORFLOW], [test x$tensorflow = xyes])
+
+
 dnl check for tools (compiler etc.)
 AC_PROG_CXX
 
@@ -82,6 +119,8 @@ AC_SUBST(plugindir)
 dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
+
+AP_CHECK_DS
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
