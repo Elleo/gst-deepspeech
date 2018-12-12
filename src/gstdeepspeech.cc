@@ -1,7 +1,7 @@
 /*
  * GStreamer DeepSpeech plugin
  * Copyright (C) 2017 Mike Sheldon <elleo@gnu.org>
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation
@@ -44,7 +44,7 @@
 /**
  * SECTION:element-deepspeech
  *
- * Speech recognition plugin suitable for continuous dictation based on 
+ * Speech recognition plugin suitable for continuous dictation based on
  * Mozilla's DeepSpeech model.
  *
  * <refsect2>
@@ -130,7 +130,7 @@ static void gst_deepspeech_load_model (GstDeepSpeech * deepspeech);
 static GMutex mutex;
 
 gpointer run_model_async(void * instance_data, void * pool_data)
-{ 
+{
   GstDeepSpeech * deepspeech = GST_DEEPSPEECH (pool_data);
   GstBuffer * buf = GST_BUFFER (instance_data);
   GstMapInfo info;
@@ -146,6 +146,8 @@ gpointer run_model_async(void * instance_data, void * pool_data)
     gst_element_post_message (GST_ELEMENT (deepspeech), msg);
   }
 
+  free(mfcc);
+  free(result);
   gst_buffer_unref(buf);
 
   return NULL;
@@ -424,7 +426,7 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
       deepspeech->buf = gst_buffer_new();
       deepspeech->quiet_bufs = 0;
   }
- 
+
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (deepspeech->srcpad, buf);
 }
