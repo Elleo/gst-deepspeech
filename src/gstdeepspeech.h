@@ -64,14 +64,12 @@ G_BEGIN_DECLS
 typedef struct _GstDeepSpeech      GstDeepSpeech;
 typedef struct _GstDeepSpeechClass GstDeepSpeechClass;
 
-using namespace DeepSpeech;
-
 struct _GstDeepSpeech
 {
   GstBaseTransform element;
   GstPad           *sinkpad, *srcpad;
   gint             quiet_bufs;
-  Model            *model;
+  ModelState       *model_state;
   GstBuffer        *buf;
   GThreadPool      *thread_pool;
   gchar            *speech_model_path;

@@ -62,6 +62,7 @@
 #include <gst/gst.h>
 #include <deepspeech.h>
 #include <string.h>
+#include <sstream>
 
 #include "gstdeepspeech.h"
 
@@ -75,7 +76,7 @@ GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 #define WORD_COUNT_WEIGHT 1.00f
 #define VALID_WORD_COUNT_WEIGHT 1.00f
 
-#define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/output_graph.pb"
+#define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/output_graph.pbmm"
 #define DEFAULT_LANGUAGE_MODEL "/usr/share/deepspeech/models/lm.binary"
 #define DEFAULT_TRIE "/usr/share/deepspeech/models/trie"
 #define DEFAULT_ALPHABET "/usr/share/deepspeech/models/alphabet.txt"
@@ -133,14 +134,11 @@ gpointer run_model_async(void * instance_data, void * pool_data)
   GstDeepSpeech * deepspeech = GST_DEEPSPEECH (pool_data);
   GstBuffer * buf = GST_BUFFER (instance_data);
   GstMapInfo info;
-  float *mfcc;
-  int n_frames = 0;
   char *result;
 
   gst_buffer_map(buf, &info, GST_MAP_READ);
   g_mutex_lock(&mutex);
-  deepspeech->model->getInputVector((const short *)info.data, (unsigned int) info.size, 16000, &mfcc, &n_frames);
-  result = deepspeech->model->infer(mfcc, n_frames);
+  result = DS_SpeechToText(deepspeech->model_state, (const short *) info.data, (unsigned int) info.size, 16000);
   g_mutex_unlock(&mutex);
 
   if (strlen(result) > 0) {
@@ -239,8 +237,22 @@ gst_deepspeech_init (GstDeepSpeech * deepspeech)
 static void
 gst_deepspeech_load_model (GstDeepSpeech * deepspeech)
 {
-  deepspeech->model = new Model(deepspeech->speech_model_path, N_CEP, N_CONTEXT, deepspeech->alphabet_path, BEAM_WIDTH);
-  deepspeech->model->enableDecoderWithLM(deepspeech->alphabet_path, deepspeech->language_model_path, deepspeech->trie_path, LM_WEIGHT, WORD_COUNT_WEIGHT, VALID_WORD_COUNT_WEIGHT);
+  int status = DS_CreateModel(deepspeech->speech_model_path, N_CEP, N_CONTEXT, deepspeech->alphabet_path, BEAM_WIDTH, &deepspeech->model_state);
+  if (status != 0) {
+    fprintf(stderr, "Could not create model.\n");
+    return;
+  }
+
+  status = DS_EnableDecoderWithLM(deepspeech->model_state,
+                                  deepspeech->alphabet_path,
+                                  deepspeech->language_model_path,
+                                  deepspeech->trie_path,
+                                  LM_WEIGHT,
+                                  VALID_WORD_COUNT_WEIGHT);
+  if (status != 0) {
+    fprintf(stderr, "Could not enable CTC decoder with LM.\n");
+    return;
+  }
 }
 
 static void
@@ -383,7 +395,6 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   register gdouble peaksquare = 0.0;
   gdouble normalizer;
   gdouble ncs = 0.0;
-  gdouble nps = 0.0;
 
   gst_buffer_map(buf, &info, GST_MAP_READ);
   in = (gint16 *)info.data;
@@ -396,7 +407,6 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 
   normalizer = (gdouble) (G_GINT64_CONSTANT(1) << 30);
   ncs = squaresum / normalizer;
-  nps = peaksquare / normalizer;
 
   if (ncs > deepspeech->silence_threshold || gst_buffer_get_size(deepspeech->buf) > 0) {
     gst_buffer_ref(buf);
