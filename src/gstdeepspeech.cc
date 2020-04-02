@@ -69,12 +69,9 @@
 GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 #define GST_CAT_DEFAULT gst_deepspeech_debug
 
-#define N_CEP 26
-#define N_CONTEXT 9
 #define BEAM_WIDTH 500
-#define LM_WEIGHT 1.75f
-#define WORD_COUNT_WEIGHT 1.00f
-#define VALID_WORD_COUNT_WEIGHT 1.00f
+#define LM_ALPHA 0.75f
+#define LM_BETA 1.85f
 
 #define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/output_graph.pbmm"
 #define DEFAULT_LANGUAGE_MODEL "/usr/share/deepspeech/models/lm.binary"
@@ -138,7 +135,7 @@ gpointer run_model_async(void * instance_data, void * pool_data)
 
   gst_buffer_map(buf, &info, GST_MAP_READ);
   g_mutex_lock(&mutex);
-  result = DS_SpeechToText(deepspeech->model_state, (const short *) info.data, (unsigned int) info.size, 16000);
+  result = DS_SpeechToText(deepspeech->model_state, (const short *) info.data, (unsigned int) info.size);
   g_mutex_unlock(&mutex);
 
   if (strlen(result) > 0) {
@@ -237,18 +234,17 @@ gst_deepspeech_init (GstDeepSpeech * deepspeech)
 static void
 gst_deepspeech_load_model (GstDeepSpeech * deepspeech)
 {
-  int status = DS_CreateModel(deepspeech->speech_model_path, N_CEP, N_CONTEXT, deepspeech->alphabet_path, BEAM_WIDTH, &deepspeech->model_state);
+  int status = DS_CreateModel(deepspeech->speech_model_path, BEAM_WIDTH, &deepspeech->model_state);
   if (status != 0) {
     fprintf(stderr, "Could not create model.\n");
     return;
   }
 
   status = DS_EnableDecoderWithLM(deepspeech->model_state,
-                                  deepspeech->alphabet_path,
                                   deepspeech->language_model_path,
                                   deepspeech->trie_path,
-                                  LM_WEIGHT,
-                                  VALID_WORD_COUNT_WEIGHT);
+                                  LM_ALPHA,
+                                  LM_BETA);
   if (status != 0) {
     fprintf(stderr, "Could not enable CTC decoder with LM.\n");
     return;
