@@ -76,6 +76,7 @@ struct _GstDeepSpeech
   gchar            *alphabet_path;
   gchar            *language_model_path;
   gchar            *trie_path;
+  gint             beam_width;
   gdouble          silence_threshold;
   gint             silence_length;
 };
