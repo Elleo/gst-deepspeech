@@ -76,7 +76,6 @@ GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 #define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/output_graph.pbmm"
 #define DEFAULT_LANGUAGE_MODEL "/usr/share/deepspeech/models/lm.binary"
 #define DEFAULT_TRIE "/usr/share/deepspeech/models/trie"
-#define DEFAULT_ALPHABET "/usr/share/deepspeech/models/alphabet.txt"
 #define DEFAULT_SILENCE_THRESHOLD 0.1
 #define DEFAULT_SILENCE_LENGTH 5
 
@@ -166,9 +165,6 @@ gst_deepspeech_class_init (GstDeepSpeechClass * klass)
   g_object_class_install_property (gobject_class, PROP_SPEECH_MODEL,
       g_param_spec_string ("speech-model", "Speech Model", "Location of the speech graph file.",
           DEFAULT_SPEECH_MODEL, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, PROP_ALPHABET,
-      g_param_spec_string ("alphabet", "Alphabet", "Location of the alphabet file corresponding to the speech model.",
-          DEFAULT_ALPHABET, G_PARAM_READWRITE));
   g_object_class_install_property (gobject_class, PROP_LANGUAGE_MODEL,
       g_param_spec_string ("language-model", "Language Model", "Location of the language model file.",
           DEFAULT_LANGUAGE_MODEL, G_PARAM_READWRITE));
@@ -220,7 +216,6 @@ gst_deepspeech_init (GstDeepSpeech * deepspeech)
   gst_element_add_pad (GST_ELEMENT (deepspeech), deepspeech->srcpad);
 
   deepspeech->speech_model_path = g_strdup (DEFAULT_SPEECH_MODEL);
-  deepspeech->alphabet_path = g_strdup (DEFAULT_ALPHABET);
   deepspeech->language_model_path = g_strdup (DEFAULT_LANGUAGE_MODEL);
   deepspeech->trie_path = g_strdup (DEFAULT_TRIE);
   deepspeech->silence_threshold = DEFAULT_SILENCE_THRESHOLD;
@@ -262,10 +257,6 @@ gst_deepspeech_set_property (GObject * object, guint prop_id,
       deepspeech->speech_model_path = g_value_dup_string (value);
       gst_deepspeech_load_model (deepspeech);
       break;
-    case PROP_ALPHABET:
-      deepspeech->alphabet_path = g_value_dup_string (value);
-      gst_deepspeech_load_model (deepspeech);
-      break;
     case PROP_LANGUAGE_MODEL:
       deepspeech->language_model_path = g_value_dup_string (value);
       gst_deepspeech_load_model (deepspeech);
@@ -295,9 +286,6 @@ gst_deepspeech_get_property (GObject * object, guint prop_id,
   switch (prop_id) {
     case PROP_SPEECH_MODEL:
       g_value_set_string (value, deepspeech->speech_model_path);
-      break;
-    case PROP_ALPHABET:
-      g_value_set_string (value, deepspeech->alphabet_path);
       break;
     case PROP_LANGUAGE_MODEL:
       g_value_set_string (value, deepspeech->language_model_path);
