@@ -135,7 +135,9 @@ gpointer run_model_async(void * instance_data, void * pool_data)
 
   gst_buffer_map(buf, &info, GST_MAP_READ);
   g_mutex_lock(&mutex);
-  result = DS_SpeechToText(deepspeech->model_state, (const short *) info.data, (unsigned int) info.size);
+  void *data = malloc(sizeof(short) * info.size);
+  memcpy(data, info.data, info.size);
+  result = DS_SpeechToText(deepspeech->model_state, (const short *) data, (unsigned int) info.size);
   g_mutex_unlock(&mutex);
 
   if (strlen(result) > 0) {
@@ -143,6 +145,7 @@ gpointer run_model_async(void * instance_data, void * pool_data)
     gst_element_post_message (GST_ELEMENT (deepspeech), msg);
   }
 
+  free(data);
   gst_buffer_unref(buf);
 
   return NULL;
