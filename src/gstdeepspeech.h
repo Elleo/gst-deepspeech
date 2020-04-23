@@ -70,6 +70,7 @@ struct _GstDeepSpeech
   GstPad           *sinkpad, *srcpad;
   gint             quiet_bufs;
   ModelState       *model_state;
+  StreamingState   *streaming_state;
   GstBuffer        *buf;
   GThreadPool      *thread_pool;
   gchar            *speech_model_path;

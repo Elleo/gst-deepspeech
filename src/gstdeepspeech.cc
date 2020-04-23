@@ -121,7 +121,7 @@ static void gst_deepspeech_get_property (GObject * object, guint prop_id,
 
 static gboolean gst_deepspeech_sink_event (GstPad * pad, GstObject * parent, GstEvent * event);
 static GstFlowReturn gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf);
-static GstMessage * gst_deepspeech_message_new (GstDeepSpeech * deepspeech, GstBuffer * buf, const char * text);
+static GstMessage * gst_deepspeech_message_new (GstDeepSpeech * deepspeech, GstBuffer * buf, const char * text, bool intermediate);
 static void gst_deepspeech_load_model (GstDeepSpeech * deepspeech);
 
 static GMutex mutex;
@@ -137,11 +137,12 @@ gpointer run_model_async(void * instance_data, void * pool_data)
   g_mutex_lock(&mutex);
   void *data = malloc(sizeof(short) * info.size);
   memcpy(data, info.data, info.size);
-  result = DS_SpeechToText(deepspeech->model_state, (const short *) data, (unsigned int) info.size);
+  DS_FeedAudioContent(deepspeech->streaming_state, (const short *) data, (unsigned int) info.size);
+  result = DS_IntermediateDecode(deepspeech->streaming_state);
   g_mutex_unlock(&mutex);
 
   if (strlen(result) > 0) {
-    GstMessage *msg = gst_deepspeech_message_new (deepspeech, buf, result);
+    GstMessage *msg = gst_deepspeech_message_new (deepspeech, buf, result, true);
     gst_element_post_message (GST_ELEMENT (deepspeech), msg);
   }
 
@@ -149,6 +150,27 @@ gpointer run_model_async(void * instance_data, void * pool_data)
   gst_buffer_unref(buf);
 
   return NULL;
+}
+
+void process_final_text(GstDeepSpeech * deepspeech, GstBuffer *buf) {
+  GstMapInfo info;
+  char *result;
+
+  gst_buffer_map(buf, &info, GST_MAP_READ);
+  void *data = malloc(sizeof(short) * info.size);
+  memcpy(data, info.data, info.size);
+  DS_FeedAudioContent(deepspeech->streaming_state, (const short *) data, (unsigned int) info.size);
+  result = DS_FinishStream(deepspeech->streaming_state);
+
+  if (strlen(result) > 0) {
+    GstMessage *msg = gst_deepspeech_message_new (deepspeech, buf, result, false);
+    gst_element_post_message (GST_ELEMENT (deepspeech), msg);
+  }
+
+  free(data);
+  gst_buffer_unref(buf);
+
+  return;
 }
 
 /* GObject vmethod implementations */
@@ -252,6 +274,12 @@ gst_deepspeech_load_model (GstDeepSpeech * deepspeech)
     fprintf(stderr, "Could not enable CTC decoder with LM.\n");
     return;
   }
+
+  status = DS_CreateStream(deepspeech->model_state, &deepspeech->streaming_state);
+  if (status != 0) {
+    fprintf(stderr, "Could not create stream.\n");
+    return;
+  }
 }
 
 static void
@@ -321,7 +349,7 @@ gst_deepspeech_get_property (GObject * object, guint prop_id,
 }
 
 static GstMessage *
-gst_deepspeech_message_new (GstDeepSpeech * deepspeech, GstBuffer * buf, const char * text)
+gst_deepspeech_message_new (GstDeepSpeech * deepspeech, GstBuffer * buf, const char * text, bool intermediate)
 {
   GstBaseTransform *trans = GST_BASE_TRANSFORM_CAST (deepspeech);
   GstStructure *s;
@@ -336,7 +364,7 @@ gst_deepspeech_message_new (GstDeepSpeech * deepspeech, GstBuffer * buf, const c
       "timestamp", G_TYPE_UINT64, GST_BUFFER_TIMESTAMP (buf),
       "stream-time", G_TYPE_UINT64, stream_time,
       "running-time", G_TYPE_UINT64, running_time,
-      "duration", G_TYPE_UINT64, GST_BUFFER_DURATION (buf),
+      "intermediate", G_TYPE_BOOLEAN, intermediate,
       "text", G_TYPE_STRING, text, NULL);
 
   return gst_message_new_element (GST_OBJECT (deepspeech), s);
@@ -364,10 +392,8 @@ gst_deepspeech_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
       ret = gst_pad_event_default (pad, parent, event);
       break;
     case GST_EVENT_EOS:
-      if (gst_buffer_get_size(deepspeech->buf) > 0) {
-        g_thread_pool_push(deepspeech->thread_pool, (gpointer) gst_buffer_copy_deep(deepspeech->buf), NULL);
-      }
       g_thread_pool_free(deepspeech->thread_pool, FALSE, TRUE);
+      process_final_text(deepspeech, gst_buffer_copy_deep(deepspeech->buf));
       ret = gst_pad_event_default (pad, parent, event);
       break;
     default:
@@ -407,10 +433,8 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   normalizer = (gdouble) (G_GINT64_CONSTANT(1) << 30);
   ncs = squaresum / normalizer;
 
-  if (ncs > deepspeech->silence_threshold || gst_buffer_get_size(deepspeech->buf) > 0) {
-    gst_buffer_ref(buf);
-    deepspeech->buf = gst_buffer_append(deepspeech->buf, buf);
-  }
+  gst_buffer_ref(buf);
+  deepspeech->buf = gst_buffer_append(deepspeech->buf, buf);
 
   if (ncs < deepspeech->silence_threshold && gst_buffer_get_size(deepspeech->buf) > 0) {
     deepspeech->quiet_bufs++;
@@ -423,7 +447,7 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
       deepspeech->buf = gst_buffer_new();
       deepspeech->quiet_bufs = 0;
   }
- 
+
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (deepspeech->srcpad, buf);
 }
