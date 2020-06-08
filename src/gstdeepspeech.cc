@@ -70,12 +70,9 @@ GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 #define GST_CAT_DEFAULT gst_deepspeech_debug
 
 #define DEFAULT_BEAM_WIDTH 500
-#define LM_ALPHA 0.75f
-#define LM_BETA 1.85f
 
-#define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/output_graph.pbmm"
-#define DEFAULT_LANGUAGE_MODEL "/usr/share/deepspeech/models/lm.binary"
-#define DEFAULT_TRIE "/usr/share/deepspeech/models/trie"
+#define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/deepspeech-0.7.1-models.pbmm"
+#define DEFAULT_SCORER "/usr/share/deepspeech/models/deepspeech-0.7.1-models.scorer"
 #define DEFAULT_SILENCE_THRESHOLD 0.1
 #define DEFAULT_SILENCE_LENGTH 5
 
@@ -90,9 +87,7 @@ enum
 {
   PROP_0,
   PROP_SPEECH_MODEL,
-  PROP_ALPHABET,
-  PROP_LANGUAGE_MODEL,
-  PROP_TRIE,
+  PROP_SCORER,
   PROP_BEAM_WIDTH,
   PROP_SILENCE_THRESHOLD,
   PROP_SILENCE_LENGTH
@@ -191,12 +186,9 @@ gst_deepspeech_class_init (GstDeepSpeechClass * klass)
   g_object_class_install_property (gobject_class, PROP_SPEECH_MODEL,
       g_param_spec_string ("speech-model", "Speech Model", "Location of the speech graph file.",
           DEFAULT_SPEECH_MODEL, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, PROP_LANGUAGE_MODEL,
-      g_param_spec_string ("language-model", "Language Model", "Location of the language model file.",
-          DEFAULT_LANGUAGE_MODEL, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, PROP_TRIE,
-      g_param_spec_string ("trie", "Trie", "Location of the trie file corresponding to the language model.",
-          DEFAULT_TRIE, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_SCORER,
+      g_param_spec_string ("scorer", "Scorer", "Location of the scorer file.",
+          DEFAULT_SCORER, G_PARAM_READWRITE));
   g_object_class_install_property (gobject_class, PROP_BEAM_WIDTH,
       g_param_spec_int ("beam-width", "Beam Width", "The beam width used by the decoder. A larger beam width generates better results at the cost of decoding time.",
           0, G_MAXINT, DEFAULT_BEAM_WIDTH, G_PARAM_READWRITE));
@@ -206,7 +198,6 @@ gst_deepspeech_class_init (GstDeepSpeechClass * klass)
   g_object_class_install_property (gobject_class, PROP_SILENCE_LENGTH,
       g_param_spec_int ("silence-length", "Silence Length", "Number of buffers which must be below the silence threshold before segmentation occurs.",
           0, G_MAXINT, DEFAULT_SILENCE_LENGTH, G_PARAM_READWRITE));
-
 
   gst_element_class_set_details_simple(gstelement_class,
     "deepspeech",
@@ -245,8 +236,7 @@ gst_deepspeech_init (GstDeepSpeech * deepspeech)
   gst_element_add_pad (GST_ELEMENT (deepspeech), deepspeech->srcpad);
 
   deepspeech->speech_model_path = g_strdup (DEFAULT_SPEECH_MODEL);
-  deepspeech->language_model_path = g_strdup (DEFAULT_LANGUAGE_MODEL);
-  deepspeech->trie_path = g_strdup (DEFAULT_TRIE);
+  deepspeech->scorer_path = g_strdup (DEFAULT_SCORER);
   deepspeech->beam_width = DEFAULT_BEAM_WIDTH;
   deepspeech->silence_threshold = DEFAULT_SILENCE_THRESHOLD;
   deepspeech->silence_length = DEFAULT_SILENCE_LENGTH;
@@ -259,19 +249,17 @@ gst_deepspeech_init (GstDeepSpeech * deepspeech)
 static void
 gst_deepspeech_load_model (GstDeepSpeech * deepspeech)
 {
-  int status = DS_CreateModel(deepspeech->speech_model_path, deepspeech->beam_width, &deepspeech->model_state);
+  int status = DS_CreateModel(deepspeech->speech_model_path, &deepspeech->model_state);
   if (status != 0) {
     fprintf(stderr, "Could not create model.\n");
     return;
   }
 
-  status = DS_EnableDecoderWithLM(deepspeech->model_state,
-                                  deepspeech->language_model_path,
-                                  deepspeech->trie_path,
-                                  LM_ALPHA,
-                                  LM_BETA);
+  DS_SetModelBeamWidth(deepspeech->model_state, DEFAULT_BEAM_WIDTH);
+
+  status = DS_EnableExternalScorer(deepspeech->model_state, deepspeech->scorer_path); 
   if (status != 0) {
-    fprintf(stderr, "Could not enable CTC decoder with LM.\n");
+    fprintf(stderr, "Could not enable scorer.\n");
     return;
   }
 
@@ -293,12 +281,8 @@ gst_deepspeech_set_property (GObject * object, guint prop_id,
       deepspeech->speech_model_path = g_value_dup_string (value);
       gst_deepspeech_load_model (deepspeech);
       break;
-    case PROP_LANGUAGE_MODEL:
-      deepspeech->language_model_path = g_value_dup_string (value);
-      gst_deepspeech_load_model (deepspeech);
-      break;
-    case PROP_TRIE:
-      deepspeech->trie_path = g_value_dup_string (value);
+    case PROP_SCORER:
+      deepspeech->scorer_path = g_value_dup_string (value);
       gst_deepspeech_load_model (deepspeech);
       break;
     case PROP_BEAM_WIDTH:
@@ -327,11 +311,8 @@ gst_deepspeech_get_property (GObject * object, guint prop_id,
     case PROP_SPEECH_MODEL:
       g_value_set_string (value, deepspeech->speech_model_path);
       break;
-    case PROP_LANGUAGE_MODEL:
-      g_value_set_string (value, deepspeech->language_model_path);
-      break;
-    case PROP_TRIE:
-      g_value_set_string (value, deepspeech->trie_path);
+    case PROP_SCORER:
+      g_value_set_string (value, deepspeech->scorer_path);
       break;
     case PROP_BEAM_WIDTH:
       g_value_set_int (value, deepspeech->beam_width);
