@@ -414,7 +414,8 @@ gst_deepspeech_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   normalizer = (gdouble) (G_GINT64_CONSTANT(1) << 30);
   ncs = squaresum / normalizer;
 
-  deepspeech->buf = gst_buffer_append(deepspeech->buf, gst_buffer_copy_deep(buf));
+  gst_buffer_ref(buf);
+  deepspeech->buf = gst_buffer_append(deepspeech->buf, buf);
 
   if (ncs < deepspeech->silence_threshold && gst_buffer_get_size(deepspeech->buf) > 0) {
     deepspeech->quiet_bufs++;
