@@ -71,8 +71,8 @@ GST_DEBUG_CATEGORY_STATIC (gst_deepspeech_debug);
 
 #define DEFAULT_BEAM_WIDTH 500
 
-#define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/deepspeech-0.7.1-models.pbmm"
-#define DEFAULT_SCORER "/usr/share/deepspeech/models/deepspeech-0.7.1-models.scorer"
+#define DEFAULT_SPEECH_MODEL "/usr/share/deepspeech/models/deepspeech-0.9.3-models.pbmm"
+#define DEFAULT_SCORER "/usr/share/deepspeech/models/deepspeech-0.9.3-models.scorer"
 #define DEFAULT_SILENCE_THRESHOLD 0.1
 #define DEFAULT_SILENCE_LENGTH 5
 
