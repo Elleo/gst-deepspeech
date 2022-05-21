@@ -1,5 +1,7 @@
 # GStreamer DeepSpeech Plugin
 
+NOTE: This plugin is now deprecated in favour of the coqui-stt branch in gst-plugins-bad: https://gitlab.freedesktop.org/philn/gstreamer/-/tree/coqui-stt/subprojects/gst-plugins-bad/ext/coqui
+
 [DeepSpeech](https://github.com/mozilla/DeepSpeech) is a speech recognition project created by [Mozilla](https://www.mozilla.org).
 
 This project provides a GStreamer element which can be placed into an audio pipeline, it will then report any recognised speech via bus messages. It automatically segments audio based on configurable silence thresholds making it suitable for continuous dictation.
