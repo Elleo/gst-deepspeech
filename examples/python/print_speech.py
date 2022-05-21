@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import gi
 gi.require_version('Gst', '1.0')
-from gi.repository import GObject, Gst
+from gi.repository import GLib, Gst
 
 
 def bus_message(bus, message):
@@ -16,9 +16,8 @@ def bus_message(bus, message):
 
 
 if __name__ == "__main__":
-    GObject.threads_init()
     Gst.init(None)
-    loop = GObject.MainLoop()
+    loop = GLib.MainLoop()
 
     pipeline = Gst.parse_launch("autoaudiosrc ! audioconvert ! audiorate ! audioresample ! deepspeech silence-length=20 ! fakesink")
     
