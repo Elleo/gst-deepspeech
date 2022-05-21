@@ -46,7 +46,7 @@
 
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
-#include "deepspeech.h"
+#include <coqui-stt.h>
 
 G_BEGIN_DECLS
 
