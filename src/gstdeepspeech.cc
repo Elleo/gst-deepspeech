@@ -60,7 +60,6 @@
 #endif
 
 #include <gst/gst.h>
-#include <deepspeech.h>
 #include <string.h>
 #include <sstream>
 
@@ -132,8 +131,8 @@ gpointer run_model_async(void * instance_data, void * pool_data)
   g_mutex_lock(&mutex);
   void *data = malloc(sizeof(short) * info.size);
   memcpy(data, info.data, info.size);
-  DS_FeedAudioContent(deepspeech->streaming_state, (const short *) data, (unsigned int) info.size);
-  result = DS_IntermediateDecode(deepspeech->streaming_state);
+  STT_FeedAudioContent(deepspeech->streaming_state, (const short *) data, (unsigned int) info.size);
+  result = STT_IntermediateDecode(deepspeech->streaming_state);
   g_mutex_unlock(&mutex);
 
   if (strlen(result) > 0) {
@@ -154,8 +153,8 @@ void process_final_text(GstDeepSpeech * deepspeech, GstBuffer *buf) {
   gst_buffer_map(buf, &info, GST_MAP_READ);
   void *data = malloc(sizeof(short) * info.size);
   memcpy(data, info.data, info.size);
-  DS_FeedAudioContent(deepspeech->streaming_state, (const short *) data, (unsigned int) info.size);
-  result = DS_FinishStream(deepspeech->streaming_state);
+  STT_FeedAudioContent(deepspeech->streaming_state, (const short *) data, (unsigned int) info.size);
+  result = STT_FinishStream(deepspeech->streaming_state);
 
   if (strlen(result) > 0) {
     GstMessage *msg = gst_deepspeech_message_new (deepspeech, buf, result, false);
@@ -249,21 +248,21 @@ gst_deepspeech_init (GstDeepSpeech * deepspeech)
 static void
 gst_deepspeech_load_model (GstDeepSpeech * deepspeech)
 {
-  int status = DS_CreateModel(deepspeech->speech_model_path, &deepspeech->model_state);
+  int status = STT_CreateModel(deepspeech->speech_model_path, &deepspeech->model_state);
   if (status != 0) {
     fprintf(stderr, "Could not create model.\n");
     return;
   }
 
-  DS_SetModelBeamWidth(deepspeech->model_state, DEFAULT_BEAM_WIDTH);
+  STT_SetModelBeamWidth(deepspeech->model_state, DEFAULT_BEAM_WIDTH);
 
-  status = DS_EnableExternalScorer(deepspeech->model_state, deepspeech->scorer_path); 
+  status = STT_EnableExternalScorer(deepspeech->model_state, deepspeech->scorer_path); 
   if (status != 0) {
     fprintf(stderr, "Could not enable scorer.\n");
     return;
   }
 
-  status = DS_CreateStream(deepspeech->model_state, &deepspeech->streaming_state);
+  status = STT_CreateStream(deepspeech->model_state, &deepspeech->streaming_state);
   if (status != 0) {
     fprintf(stderr, "Could not create stream.\n");
     return;
